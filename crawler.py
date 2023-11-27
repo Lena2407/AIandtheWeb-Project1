@@ -5,6 +5,8 @@ import re
 TESTURL = 'https://vm009.rz.uos.de/crawl/index.html'
 UNIURL = 'https://www.uos.de'
 
+# uikit
+
 # week 2: flask app and index with whoosh library
 # flask app: 2 urls, 
 #   get home url (show search form)
