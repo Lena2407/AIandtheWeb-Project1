@@ -26,6 +26,8 @@ UNIURL = 'https://www.uos.de'
 
 global ix
 
+app 
+
 def crawl(start_url):
     '''
     Crawls (gets and parses) all the HTML pages on a certain server
