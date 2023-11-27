@@ -8,7 +8,7 @@ from whoosh.fields import *
 from whoosh.query import *
 from whoosh.qparser import QueryParser
 
-from flask import Flask
+from flask import Flask, request, render_template, redirect, url_for
 
 
 
@@ -26,7 +26,24 @@ UNIURL = 'https://www.uos.de'
 
 global ix
 
-app 
+app = Flask(__name__)
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        query = request.form.get('query', '')
+        # Redirect to the search route with the user's query
+        return redirect(url_for('search', query=query))
+    return render_template('index.html')
+
+@app.route('/search')
+def search():
+    crawl(TESTURL)
+    query = request.args.get('query', '')
+    results = perform_search(query)
+    print('Amount Results: ', len(results))
+    return render_template('results.html', query=query, results=results)
+
 
 def crawl(start_url):
     '''
@@ -100,7 +117,7 @@ def crawl(start_url):
     writer.commit()
 
 
-def search(querystring):
+def perform_search(querystring):
     print('starts searching')
 
     global ix
@@ -114,17 +131,4 @@ def search(querystring):
         if len(results) > 0:
             for result in results:
                 print(result)
-
-
-def main():
-    global ix
-
-    crawl(TESTURL)
-    #crawl(UNIURL)
-
-    querystring_example = "Page"
-    search(querystring_example)
-
-
-if __name__ == "__main__":
-    main()
+        return results
