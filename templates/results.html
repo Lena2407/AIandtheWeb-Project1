@@ -9,10 +9,10 @@
     <h1>Search Results for "{{ query }}"</h1>
     {% if results %}
         <ul>
-            {% for hit in results %}
-                <li>
-                    <h3>{{ hit['title'] }}</h3>
-                    <p>{{ hit['path'] }}</p>
+            {% for i in range(results_len) %}
+                <li> 
+                    <h2>{{ results['title'][i] }}</h2> 
+                    <a href="{{results['path'][i]}}"> {{results['path'][i]}} </a>
                 </li>
             {% endfor %}
         </ul>
