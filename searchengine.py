@@ -25,10 +25,15 @@ UNIURL = 'https://www.uos.de'
 #   username: user029
 #   password:WsP677k
 #   ssh user029@vm520.rz.uni-osnabrueck.de
+#   copy files: scp ./searchengine.wsgi user029@vm520.rz.uni-osnabrueck.de:~/public_html/
 #   update app: touch searchengine.wsgi
 
 # correct spelling mistakes, did you mean?
 # sorting search hits
+
+# crawler:
+#   you don't want to crawl all the time/ everytime a search is done
+#   good idea: start crawler seperately, continuousely in background?
 
 global ix
 
