@@ -12,24 +12,20 @@ from whoosh.qparser import QueryParser
 from flask import Flask, request, render_template, redirect, url_for
 
 
-
 TESTURL = 'https://vm009.rz.uos.de/crawl/index.html'
 UNIURL = 'https://www.uos.de'
 
 # uikit example for frontend
 
-# Improve the index by adding information (Done: Title)
-# Improve the output by including title and teaser text (Done: title, TODO: Teaser Text)
 # Install your search engine on the demo server provided 
 #   vpn connection to university network
 #   username: user029
 #   password:WsP677k
 #   ssh user029@vm520.rz.uni-osnabrueck.de
 #   copy files: scp ./searchengine.wsgi user029@vm520.rz.uni-osnabrueck.de:~/public_html/
+#               scp ./searchengine.py user029@vm520.rz.uni-osnabrueck.de:~/public_html/
 #   update app: touch searchengine.wsgi
-
-# correct spelling mistakes, did you mean?
-# sorting search hits
+#   http://vm520.rz.uni-osnabrueck.de/user029/searchengine.wsgi
 
 # crawler:
 #   you don't want to crawl all the time/ everytime a search is done
@@ -69,7 +65,7 @@ def crawl(start_url):
     '''
     global ix
 
-    schema = Schema(title=TEXT(stored=True), path=ID(stored=True), content=TEXT)
+    schema = Schema(title=TEXT(stored=True), path=ID(stored=True), content=TEXT, teaser=TEXT(stored=True))
     if not os.path.exists("index"):
         os.mkdir("index")
     ix = create_in("index", schema)
@@ -98,9 +94,14 @@ def crawl(start_url):
 
         #print ('Title: ', current_title)
         #print ('Path: ', current_url)
-        #print ('Content: ', soup.text)
+        print ('Content: ', soup.text)
+
+        teaser = soup.find('p').text
+        if len(teaser) > 100:
+            teaser = (teaser[:100] + '..')
+        print ('Teaser: ', teaser)
         
-        writer.add_document(title=current_title, path=current_url, content=soup.text)
+        writer.add_document(title=current_title, path=current_url, content=soup.text, teaser=teaser)
         
         # find links (urls) in content
         # <a href="...">Text</a>
@@ -144,7 +145,7 @@ def perform_search(querystring):
     global ix
 
     with ix.searcher() as searcher:
-        result_list = {"title": [], "path": []}
+        result_list = {"title": [], "path": [], "teaser": []}
 
         parser = QueryParser("content", ix.schema)
         myquery = parser.parse(querystring)
@@ -166,7 +167,24 @@ def perform_search(querystring):
                 fields = hit.fields()
                 result_list['title'].append(fields['title'])
                 result_list['path'].append(fields['path'])
+                result_list['teaser'].append(fields['teaser'])
         else:
             print('No Correction could be found for query string.')
+        
+        #sorting search hits
 
-        return result_list, len(result_list['title']), querystring
+        # Combine the lists into pairs
+        combined_pairs = zip(result_list['title'], result_list['path'], result_list['teaser'])
+
+        # Sort the pairs based on the first element
+        sorted_pairs = sorted(combined_pairs, key=lambda x: x[0])
+
+        # Unzip the sorted pairs back into separate lists
+        sorted_first_key, sorted_second_key, sorted_third_key = zip(*sorted_pairs)
+
+        # Create a new dictionary with the sorted lists
+        sorted_dict = {'title': list(sorted_first_key), 'path': list(sorted_second_key), 'teaser': list(sorted_third_key)}
+
+        print(sorted_dict)
+
+        return sorted_dict, len(sorted_dict['title']), querystring
