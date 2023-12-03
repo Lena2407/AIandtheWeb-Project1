@@ -1,13 +1,21 @@
-import json
-import os
-import requests
-from bs4 import BeautifulSoup
-import re
+'''
+Simple search engine
 
-from whoosh.index import create_in
+A simple search engine that performs a search for entered search queries 
+on a beforehand established index of the whoosh library. The search engine
+can be used with the help of a flask app. To use the search engine the 
+following link can be opend. Be aware, that a connection to the wifi of 
+University of Osnabrueck has to be established.
+
+http://vm520.rz.uni-osnabrueck.de/user029/searchengine.wsgi
+
+authors: Lena Brueggemann, Dalva Pauline Beeck
+'''
+
 from whoosh.fields import *
 from whoosh.query import *
 from whoosh.qparser import QueryParser
+from whoosh import index
 
 from flask import Flask, request, render_template, redirect, url_for
 
@@ -15,41 +23,33 @@ from flask import Flask, request, render_template, redirect, url_for
 TESTURL = 'https://vm009.rz.uos.de/crawl/index.html'
 UNIURL = 'https://www.uos.de'
 
-# uikit example for frontend
-
-# Install your search engine on the demo server provided 
-#   vpn connection to university network
-#   username: user029
-#   password:WsP677k
-#   ssh user029@vm520.rz.uni-osnabrueck.de
-#   copy files: scp ./searchengine.wsgi user029@vm520.rz.uni-osnabrueck.de:~/public_html/
-#               scp ./searchengine.py user029@vm520.rz.uni-osnabrueck.de:~/public_html/
-#   update app: touch searchengine.wsgi
-#   http://vm520.rz.uni-osnabrueck.de/user029/searchengine.wsgi
-
-# crawler:
-#   you don't want to crawl all the time/ everytime a search is done
-#   good idea: start crawler seperately, continuousely in background?
-
-global ix
 
 app = Flask(__name__)
 
+# Home route ('/')
 @app.route('/', methods=['GET', 'POST'])
-def index():
+def home():
+    '''
+    Renders the 'index.html' template and redirects to the search route 
+    when a search query is entered.
+    '''
     if request.method == 'POST':
         query = request.form.get('query', '')
         # Redirect to the search route with the user's query
         return redirect(url_for('search', query=query))
+    # If it's a GET request, render the home template ('index.html')
     return render_template('index.html')
 
+# Search route ('/search')
 @app.route('/search')
 def search():
-    crawl(TESTURL)
+    '''
+    Gets the user's query from the URL parameters, perform the search operation 
+    and gets results, renders the 'results' template.
+    '''
     query = request.args.get('query', '')
-    results, results_len, query = perform_search(query)
-    print('Amount Results: ', len(results))
-    return render_template('results.html', query=query, results=results, results_len=results_len)
+    results, results_len, real_query, correction = perform_search(query)
+    return render_template('results.html', real_query=real_query, results=results, results_len=results_len, correction=correction, old_query=query)
 
 # handle all internal errors (500)
 import traceback
@@ -57,134 +57,56 @@ import traceback
 def internal_error(exception):
    return "<pre>"+traceback.format_exc()+"</pre>"
 
-
-
-def crawl(start_url):
-    '''
-    Crawls (gets and parses) all the HTML pages on a certain server
-    '''
-    global ix
-
-    schema = Schema(title=TEXT(stored=True), path=ID(stored=True), content=TEXT, teaser=TEXT(stored=True))
-    if not os.path.exists("index"):
-        os.mkdir("index")
-    ix = create_in("index", schema)
-
-    writer = ix.writer()
-
-
-    urls = [start_url]
-    visited_urls = []
-
-    split_url = start_url.split('/')
-    server = split_url[2]
-    base_url = split_url[0] + '//' + server
-
-    while len(urls) != 0:
-        current_url = urls.pop(0)
-        visited_urls.append(current_url)
-
-        # crawl for new url links
-        response = requests.get(current_url, timeout=0.5) # get requests
-        status = response.status_code
-        if status != 200: # status code 200 means everything went well
-            continue
-        soup = BeautifulSoup(response._content, 'html.parser') #print(soup.title.text) #print(soup.text) # text of entire page without html tags
-        current_title = soup.title.text
-
-        #print ('Title: ', current_title)
-        #print ('Path: ', current_url)
-        print ('Content: ', soup.text)
-
-        teaser = soup.find('p').text
-        if len(teaser) > 100:
-            teaser = (teaser[:100] + '..')
-        print ('Teaser: ', teaser)
-        
-        writer.add_document(title=current_title, path=current_url, content=soup.text, teaser=teaser)
-        
-        # find links (urls) in content
-        # <a href="...">Text</a>
-        for link in soup.find_all('a'):
-            url = link['href']
-
-            # Full link
-            if 'http' in url:
-                if base_url in url:
-                    if url not in visited_urls:
-                        urls.append(url)
-            elif url[0] == '/':
-                url = base_url + url
-                if url not in visited_urls:
-                    urls.append(url)
-            # replace last part of path if no '/' as starting point
-            elif re.search(r'^[a-z0-9]+\.html$', url): 
-                #print('subpage: ', url)
-                if 'index.html' in current_url:
-                    current_url_main = current_url.split('index.html')[0]
-                url = current_url_main + url
-                #print('new: ', url)
-                if url not in visited_urls:
-                    urls.append(url)
-                #print(link['href']) # extracting urls of website
-                #print(link.text)
-
-            else:
-                print('did not understand url: ', url)
-
-    print(visited_urls)
-    writer.commit()
-
-
 def perform_search(querystring):
     '''
-    Performs search by querystring.
-    '''
-    print('starts searching')
+    Performs a search for the querystring using the indexdir.
 
-    global ix
+    Attributes:
+        querystring: A string of words to search for in the content of the index.
+    
+    Returns:
+        sorted_dict: A dictionary that contains the results with the keys title, path and a teaser text.
+        len(sorted_dict['title']): An integer that specifies the amount of results found.
+        querystring: A string that was used as the search query for the performed search.
+        correction: A boolean that indicates, if the search query was corrected (True) or not (False).
+    '''
+    # use the stored index to perform the search
+    ix = index.open_dir("indexdir")
 
     with ix.searcher() as searcher:
         result_list = {"title": [], "path": [], "teaser": []}
+        sorted_dict = {"title": [], "path": [], "teaser": []}
+        correction = False
 
+        # perform the search with the given querystring
         parser = QueryParser("content", ix.schema)
         myquery = parser.parse(querystring)
         results = searcher.search(myquery)
-
-        print('Number Results: ', len(results))
  
-        # try to correct, if no results from querystring
+        # try once to correct search query, if no results from querystring were found
         if len(results) == 0:
             corrected = searcher.correct_query(myquery, querystring)
             if corrected.query != myquery:
-                print("CORRECT: ", corrected.string)
+                correction = True
+                # perform the search again, if query could be corrected
                 querystring = corrected.string
                 myquery = parser.parse(querystring)
                 results = searcher.search(myquery)
 
+        # store and sort search results, if any were found
         if len(results) > 0:
             for hit in results:
                 fields = hit.fields()
                 result_list['title'].append(fields['title'])
                 result_list['path'].append(fields['path'])
                 result_list['teaser'].append(fields['teaser'])
-        else:
-            print('No Correction could be found for query string.')
-        
-        #sorting search hits
 
-        # Combine the lists into pairs
-        combined_pairs = zip(result_list['title'], result_list['path'], result_list['teaser'])
+            # sorting search hits alphabetically
+            combined_pairs = zip(result_list['title'], result_list['path'], result_list['teaser'])
+            sorted_pairs = sorted(combined_pairs, key=lambda x: x[0])
+            sorted_first_key, sorted_second_key, sorted_third_key = zip(*sorted_pairs)
 
-        # Sort the pairs based on the first element
-        sorted_pairs = sorted(combined_pairs, key=lambda x: x[0])
+            # Create a new dictionary with the sorted lists
+            sorted_dict = {'title': list(sorted_first_key), 'path': list(sorted_second_key), 'teaser': list(sorted_third_key)}
 
-        # Unzip the sorted pairs back into separate lists
-        sorted_first_key, sorted_second_key, sorted_third_key = zip(*sorted_pairs)
-
-        # Create a new dictionary with the sorted lists
-        sorted_dict = {'title': list(sorted_first_key), 'path': list(sorted_second_key), 'teaser': list(sorted_third_key)}
-
-        print(sorted_dict)
-
-        return sorted_dict, len(sorted_dict['title']), querystring
+        return sorted_dict, len(sorted_dict['title']), querystring, correction

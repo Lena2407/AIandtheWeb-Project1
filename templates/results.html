@@ -6,8 +6,11 @@
     <title>Search Results</title>
 </head>
 <body>
-    <h1>Search Results for "{{ query }}"</h1>
-    {% if results %}
+    {% if correction %}
+        <h2>No results found for "{{ old_query }}". Did you mean "{{ real_query }}"?</h2>
+    {% endif %}
+    <h1>Search Results for "{{ real_query }}"</h1>
+    {% if results_len > 0 %}
         <ul>
             {% for i in range(results_len) %}
                 <li> 
@@ -18,7 +21,7 @@
             {% endfor %}
         </ul>
     {% else %}
-        <p>No results found for "{{ query }}".</p>
+        <p>No results found for "{{ real_query }}".</p>
     {% endif %}
 </body>
 </html>
