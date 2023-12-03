@@ -1,5 +1,5 @@
 '''
-Simple search engine
+Simple Search Engine
 
 A simple search engine that performs a search for entered search queries 
 on a beforehand established index of the whoosh library. The search engine
@@ -16,13 +16,10 @@ from whoosh.fields import *
 from whoosh.query import *
 from whoosh.qparser import QueryParser
 from whoosh import index
-
 from flask import Flask, request, render_template, redirect, url_for
-
 
 TESTURL = 'https://vm009.rz.uos.de/crawl/index.html'
 UNIURL = 'https://www.uos.de'
-
 
 app = Flask(__name__)
 

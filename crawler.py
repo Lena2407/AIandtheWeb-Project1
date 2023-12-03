@@ -1,5 +1,5 @@
 '''
-Simple crawler
+Simple Crawler
 
 A simple crawler that creates an index for a given start url and all
 its url references that lead to the ssame server. The index is build 
